@@ -1,6 +1,6 @@
 # Field Bus Protocol v0.1
 
-Shared CAN / CAN-FD language for MetaField physical field nodes.
+Shared **CAN-FD** language for MetaField physical field nodes.
 
 One protocol. Many ESP32s. No protocol drift.
 
@@ -12,11 +12,13 @@ One protocol. Many ESP32s. No protocol drift.
 ├──────────────────────────┤
 │ Field Bus Protocol       │  ← this repository (identical on every node)
 ├──────────────────────────┤
-│ CAN / CAN-FD driver      │
+│ CAN-FD driver            │  (MCP2518FD / TCAN4550 / etc.)
 ├──────────────────────────┤
-│ ESP32 TWAI / CAN-FD      │
+│ ESP32 + CAN-FD transceiver│
 └──────────────────────────┘
 ```
+
+**CAN-FD is the native mode.** Classic CAN (8-byte) is only a degraded fallback for early bring-up.
 
 ---
 
@@ -92,9 +94,9 @@ Critical traffic wins arbitration automatically.
 
 ---
 
-## 3. Common Payload Header
+## 3. Common Payload Header (CAN-FD)
 
-Every frame carries a short, predictable header. Designed for both classic CAN (8-byte) and CAN-FD (up to 64-byte).
+Every frame carries a short, predictable header followed by type-specific payload. Designed for **CAN-FD** (up to 64 bytes total).
 
 ```c
 typedef struct __attribute__((packed)) {
@@ -104,11 +106,19 @@ typedef struct __attribute__((packed)) {
     uint8_t  target;      // target node ID (0 = broadcast)
     uint16_t sequence;    // monotonic per-source sequence number
     uint16_t length;      // payload bytes that follow
-    // uint8_t payload[]; // variable
+    // uint8_t payload[]; // variable, up to 56 bytes in one FD frame
 } FieldBusHeader;
 ```
 
-Total header = 8 bytes. On classic CAN this leaves 0 bytes for payload in the same frame; use multi-frame or move to CAN-FD for richer data. On CAN-FD the remaining bytes are pure payload.
+Total header = 8 bytes. Remaining bytes (up to 56 in a 64-byte FD frame) are pure payload.
+
+This is enough for:
+- Full NODE_STATUS (with temperature + supply)
+- Compact FIELD_OBSERVATION summaries
+- SENSOR_DATA with several channels
+- ACK / NACK with context
+
+Larger observations can still use multi-frame later if needed.
 
 ---
 
@@ -121,7 +131,7 @@ POWER ON
    ↓
 Initialize hardware (GPIO, ADC, lasers, FRAM …)
    ↓
-Initialize CAN / TWAI
+Initialize CAN-FD
    ↓
 Listen briefly for existing coordinator
    ↓
@@ -213,7 +223,7 @@ Coordinator periodically broadcasts:
 
 ```
 TIME_SYNC
-  network_time_us     // or ms, decide at implementation
+  network_time_us
   sync_sequence
 ```
 
@@ -226,7 +236,7 @@ photodiode response
       ↓
 ESP32 measurement
       ↓
-CAN transmission
+CAN-FD transmission
       ↓
 MetaField observation
 ```
@@ -266,23 +276,16 @@ protocol/
 
 Every node firmware includes these files (copy, submodule, or PlatformIO lib).
 
-```
-ESP32 Optical  ─┐
-ESP32 Sensor   ─┤
-ESP32 Actuator ─┼── all include the SAME definitions
-ESP32 Compute  ─┤
-ESP32 Host     ─┘
-```
-
 ---
 
 ## 10. Implementation Notes
 
-- Prefer **CAN-FD** from day one. Classic CAN remains usable for the 8-byte header + small payloads.
+- **CAN-FD is required** for full-sized frames (header + payload in one shot).
+- ESP32 built-in TWAI is classic CAN only — use an external CAN-FD controller (MCP2518FD, TCAN4550, etc.) via SPI for production nodes.
 - Sequence numbers are per-source and wrap at 16 bits.
 - Target 0x00 = broadcast. Nodes ignore frames whose target is neither themselves nor 0x00 (except discovery messages).
-- Keep the application layer completely free of CAN bit-twiddling. All packing/unpacking lives in `can_codec`.
+- Keep the application layer free of CAN bit-twiddling. All packing/unpacking lives in `can_codec`.
 
 ---
 
-*Field Bus v0.1 — the common language for the physical field substrate.*
+*Field Bus v0.1 — the common language for the physical field substrate. CAN-FD native.*

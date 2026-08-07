@@ -1,6 +1,6 @@
 # field-bus
 
-**Shared CAN / CAN-FD protocol for MetaField physical field nodes.**
+**Shared CAN-FD protocol for MetaField physical field nodes.**
 
 One language. Every ESP32 speaks it.
 
@@ -44,11 +44,15 @@ README.md                  This file
 
 ## Design principles
 
+- **CAN-FD native** — full header + payload in one frame (up to 64 bytes).
 - **Dictated, not interactive** — protocol is fixed at compile time across the fleet.
 - **Priority in the CAN ID** — emergency and control traffic wins arbitration for free.
 - **Discovery by announcement** — nodes declare capabilities; the coordinator does not hard-code roles.
 - **Time is first-class** — required for correlating laser / photodiode / MetaField observations.
-- **CAN-FD native** — classic CAN still works for the 8-byte header + small payloads.
+
+## Hardware note
+
+ESP32 built-in TWAI is classic CAN only. Production nodes use an external CAN-FD controller (MCP2518FD, TCAN4550, …) over SPI. The protocol assumes FD frame sizes.
 
 ## Node ID suggestions (6-node starter)
 
