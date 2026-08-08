@@ -40,6 +40,7 @@ extern "C" {
 #define FB_MSG_SENSOR_DATA       0x40
 #define FB_MSG_FIELD_OBSERVATION 0x41   /* optical body FieldObservation */
 #define FB_MSG_TELEMETRY         0x42
+#define FB_MSG_HALL_FRAME        0x43   /* 10× Hall snapshot (hall-node-s3) */
 
 /* 0x50–0x5F  Events */
 #define FB_MSG_SENSOR_EVENT      0x50   /* LM393 edges, thresholds, etc. */
